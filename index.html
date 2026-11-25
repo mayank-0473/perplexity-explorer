@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perplexity Explorer — Ascend Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Pin Three.js r0.143.0 for shader chunk compatibility -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+      "three/examples/jsm/": "https://unpkg.com/three@0.143.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #04060f;
+      --bg-2: #060a18;
+      --ink: #f3f6ff;
+      --muted: #9aa6c4;
+      --muted-2: #6b7796;
+      --line: rgba(150, 175, 230, .12);
+      --line-strong: rgba(150, 175, 230, .22);
+      --accent: #5df0a8;
+      --accent-2: #2fd38a;
+      --accent-ink: #032018;
+      --blue: #5b7cfa;
+      --purple: #8b5cf6;
+      --glass: rgba(12, 18, 38, .62);
+      --glass-2: rgba(16, 24, 48, .74);
+      --radius: 18px;
+      --radius-lg: 26px;
+      --maxw: 1180px;
+      --shadow: 0 30px 80px -30px rgba(0, 0, 0, .75);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* Lenis smooth scroll */
+    html.lenis, html.lenis body { height: auto; }
+    .lenis.lenis-smooth { scroll-behavior: auto !important; }
+    .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+    .lenis.lenis-stopped { overflow: hidden; }
+
+    /* Staggered scroll-reveal */
+    [data-reveal] {
+      opacity: 0;
+      transform: translateY(26px);
+      transition: opacity .7s cubic-bezier(.22, .7, .2, 1), transform .7s cubic-bezier(.22, .7, .2, 1);
+      transition-delay: var(--rd, 0ms);
+      will-change: opacity, transform;
+    }
+    [data-reveal].in { opacity: 1; transform: none; }
+
+    /* Fixed WebGL planet behind everything */
+    .planet-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .page { position: relative; z-index: 1; }
+
+    /* Navigation */
+    .nav {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .brand-mark {
+      color: var(--accent);
+      font-size: 14px;
+      transform: translateY(-1px);
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: 14.5px;
+      color: var(--muted);
+    }
+    .nav-links a:hover { color: var(--ink); }
+
+    /* Hero */
+    .hero {
+      min-height: 76vh;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(125% 62% at 50% -10%, rgba(4, 6, 15, .82) 0%, rgba(4, 6, 15, .28) 44%, transparent 68%);
+    }
+    .hero-inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px 60px;
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    .hero-title {
+      font-size: clamp(34px, 5.2vw, 62px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -.03em;
+      max-width: 16ch;
+      text-shadow: 0 2px 50px rgba(0, 0, 0, .55);
+    }
+    .hero-title em {
+      font-style: normal;
+      background: linear-gradient(180deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-sub {
+      margin-top: 20px;
+      max-width: 580px;
+      font-size: clamp(16px, 2vw, 19px);
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* Sections & Glass Cards */
+    .section {
+      position: relative;
+      z-index: 1;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: clamp(36px, 6vw, 72px) 24px;
+    }
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-lg);
+      padding: clamp(22px, 3.5vw, 36px);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card-header h2 {
+      font-size: clamp(22px, 2.8vw, 30px);
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(93, 240, 168, .12);
+      color: var(--accent);
+      border: 1px solid rgba(93, 240, 168, .25);
+    }
+    .badge-sim {
+      background: rgba(139, 92, 246, .16);
+      color: #c4b5fd;
+      border-color: rgba(139, 92, 246, .35);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 600;
+      padding: 11px 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .25s ease, background .2s ease, border-color .2s ease;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none !important; }
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      box-shadow: 0 10px 28px -8px rgba(91, 124, 250, .55);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 34px -8px rgba(139, 92, 246, .7);
+    }
+    .btn-outline {
+      color: var(--ink);
+      background: rgba(255, 255, 255, .05);
+      border-color: var(--line-strong);
+    }
+    .btn-outline:hover:not(:disabled) {
+      background: rgba(255, 255, 255, .11);
+      transform: translateY(-1px);
+    }
+    .btn-sm { padding: 7px 14px; font-size: 13px; }
+    .btn-danger {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, .12);
+      border-color: rgba(239, 68, 68, .28);
+    }
+    .btn-danger:hover { background: rgba(239, 68, 68, .22); }
+
+    /* Inputs */
+    .input-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    input[type="text"], input[type="number"] {
+      font-family: inherit;
+      font-size: 15px;
+      color: var(--ink);
+      background: rgba(4, 6, 15, .65);
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color .2s ease;
+    }
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--accent);
+    }
+    .sentence-input { flex: 1; min-width: 240px; }
+
+    .sample-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .sample-label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+
+    .status-line {
+      font-size: 13.5px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .status-line.ready { color: var(--accent); }
+    .status-line.error {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, .12);
+      border: 1px solid rgba(239, 68, 68, .3);
+      padding: 10px 14px;
+      border-radius: 10px;
+      margin-top: 8px;
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(4, 6, 15, .45);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+      text-align: left;
+    }
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .02);
+    }
+    tr:last-child td { border-bottom: none; }
+    .token-pill {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13.5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(91, 124, 250, .18);
+      border: 1px solid rgba(91, 124, 250, .3);
+      color: #dbeafe;
+    }
+
+    /* Steps Box */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .step-box {
+      background: rgba(4, 6, 15, .5);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .step-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .step-body {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .perplexity-big {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      background: linear-gradient(180deg, #fff, var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      line-height: 1.1;
+    }
+
+    /* Next-token bars */
+    .bars-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 70px;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+    .bar-track {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .07);
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+      transition: width .35s ease;
+    }
+    .bar-row.top .bar-fill {
+      background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    }
+    .bar-row.top .bar-pct { color: var(--accent); font-weight: 700; }
+    .bar-pct { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* Simulator rows */
+    .sim-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .sim-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .sim-row input[type="text"] { flex: 1; min-width: 150px; padding: 9px 12px; }
+    .sim-row input[type="number"] { width: 130px; padding: 9px 12px; }
+
+    /* Footer */
+    .footer {
+      max-width: var(--maxw);
+      margin: 40px auto 0;
+      padding: 36px 24px 56px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      color: var(--muted-2);
+      font-size: 13.5px;
+    }
+
+    @media (max-width: 820px) {
+      .steps-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+    @media (max-width: 560px) {
+      .bar-row { grid-template-columns: 95px 1fr 56px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Fixed WebGL Earth Canvas -->
+  <canvas class="planet-canvas"></canvas>
+
+  <div class="page" id="top">
+    <!-- Hero & Navigation -->
+    <header class="hero">
+      <nav class="nav">
+        <a href="#top" class="brand">
+          <span class="brand-mark">▲</span>
+          <span>Perplexity Explorer</span>
+        </a>
+        <div class="nav-links">
+          <a href="#sec1">Model</a>
+          <a href="#sec2">Perplexity</a>
+          <a href="#sec3">Next Token</a>
+          <a href="#sec4">Simulator</a>
+        </div>
+        <a href="#sec4" class="btn btn-outline btn-sm">Try by Hand</a>
+      </nav>
+
+      <div class="hero-inner">
+        <span class="eyebrow" data-reveal style="--rd:60ms">In-Browser Language Model</span>
+        <h1 class="hero-title" data-reveal style="--rd:160ms">Explore <em>Perplexity</em> in Real Time</h1>
+        <p class="hero-sub" data-reveal style="--rd:260ms">
+          Run a real GPT-2 model directly in your browser with Transformers.js, inspect token probabilities, and see how perplexity measures surprise.
+        </p>
+      </div>
+    </header>
+
+    <!-- Section 1: Type a sentence -->
+    <section class="section" id="sec1">
+      <div class="card" data-reveal style="--rd:80ms">
+        <div class="card-header">
+          <h2>1. Type a sentence</h2>
+          <span class="badge">Xenova/distilgpt2 (q8)</span>
+        </div>
+
+        <div class="input-row">
+          <input id="sentenceInput" class="sentence-input" type="text" value="I love Python" placeholder="Type a sentence..." />
+          <button id="calcBtn" class="btn btn-primary">Calculate perplexity</button>
+        </div>
+
+        <div class="sample-row">
+          <span class="sample-label">Samples:</span>
+          <button class="btn btn-outline btn-sm sample-btn" data-text="I love Python">I love Python</button>
+          <button class="btn btn-outline btn-sm sample-btn" data-text="Python love I">Python love I</button>
+          <button class="btn btn-outline btn-sm sample-btn" data-text="The capital of France is Paris">The capital of France is Paris</button>
+        </div>
+
+        <div id="statusLine" class="status-line">Click "Calculate perplexity" or a sample to load the model in your browser.</div>
+      </div>
+    </section>
+
+    <!-- Section 2: Probability of each token -> perplexity -->
+    <section class="section" id="sec2">
+      <div class="card" data-reveal style="--rd:80ms">
+        <div class="card-header">
+          <h2>2. Probability of each token → perplexity</h2>
+        </div>
+
+        <div id="modelResultsEmpty" style="color:var(--muted); font-size:14.5px;">
+          Run a sentence in Section 1 to see each token's probability and the step-by-step perplexity calculation.
+        </div>
+
+        <div id="modelResults" style="display:none;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Token</th>
+                  <th>Probability P</th>
+                  <th>1 / P</th>
+                </tr>
+              </thead>
+              <tbody id="modelTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="steps-grid">
+            <div class="step-box">
+              <div class="step-title">Step 1 · Multiply 1/P</div>
+              <div id="modelStep1" class="step-body">—</div>
+            </div>
+            <div class="step-box">
+              <div class="step-title">Step 2 · Token count</div>
+              <div id="modelStep2" class="step-body">—</div>
+            </div>
+            <div class="step-box">
+              <div class="step-title">Step 3 · Perplexity = (product)^(1/N)</div>
+              <div id="modelStep3" class="perplexity-big">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: What does the model predict next? -->
+    <section class="section" id="sec3">
+      <div class="card" data-reveal style="--rd:80ms">
+        <div class="card-header">
+          <h2>3. What does the model predict next?</h2>
+        </div>
+        <div id="nextEmpty" style="color:var(--muted); font-size:14.5px;">
+          Top 8 next-token predictions from the final position will appear here after calculation.
+        </div>
+        <div id="nextBars" class="bars-list"></div>
+      </div>
+    </section>
+
+    <!-- Section 4: Try it by hand -->
+    <section class="section" id="sec4">
+      <div class="card" data-reveal style="--rd:80ms">
+        <div class="card-header">
+          <h2>4. Try it by hand</h2>
+          <span class="badge badge-sim">Simulated, not from the model</span>
+        </div>
+
+        <div class="sample-row">
+          <span class="sample-label">Presets:</span>
+          <button class="btn btn-outline btn-sm preset-btn" data-preset="python">I love Python</button>
+          <button class="btn btn-outline btn-sm preset-btn" data-preset="eighth">All 1/8</button>
+          <button class="btn btn-outline btn-sm preset-btn" data-preset="surprising">One surprising word</button>
+        </div>
+
+        <div id="simRows" class="sim-rows"></div>
+        <button id="addTokenBtn" class="btn btn-outline btn-sm">+ Add token</button>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Token</th>
+                <th>Probability P</th>
+                <th>1 / P</th>
+              </tr>
+            </thead>
+            <tbody id="simTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-box">
+            <div class="step-title">Step 1 · Multiply 1/P</div>
+            <div id="simStep1" class="step-body">—</div>
+          </div>
+          <div class="step-box">
+            <div class="step-title">Step 2 · Token count</div>
+            <div id="simStep2" class="step-body">—</div>
+          </div>
+          <div class="step-box">
+            <div class="step-title">Step 3 · Perplexity = (product)^(1/N)</div>
+            <div id="simStep3" class="perplexity-big">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div><span class="brand-mark">▲</span> <strong>Perplexity Explorer</strong> · Ascend Edition</div>
+      <div>© <span id="yearSpan"></span> · Built among the stars</div>
+    </footer>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SCRIPT 1: Perplexity Explorer (Transformers.js + Manual Simulator)    -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    import { AutoTokenizer, AutoModelForCausalLM, Tensor } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
+
+    // Set current year in footer
+    document.getElementById("yearSpan").textContent = new Date().getFullYear();
+
+    // DOM elements for Section 1, 2, 3
+    const sentenceInput = document.getElementById("sentenceInput");
+    const calcBtn = document.getElementById("calcBtn");
+    const statusLine = document.getElementById("statusLine");
+    const modelResultsEmpty = document.getElementById("modelResultsEmpty");
+    const modelResults = document.getElementById("modelResults");
+    const modelTableBody = document.getElementById("modelTableBody");
+    const modelStep1 = document.getElementById("modelStep1");
+    const modelStep2 = document.getElementById("modelStep2");
+    const modelStep3 = document.getElementById("modelStep3");
+    const nextEmpty = document.getElementById("nextEmpty");
+    const nextBars = document.getElementById("nextBars");
+
+    // Model state (loaded lazily on first click)
+    let tokenizer = null;
+    let model = null;
+    let isLoading = false;
+
+    // Helper: format spaces as ␣ so beginners can see leading spaces on GPT-2 tokens
+    function formatToken(str) {
+      return str.replace(/ /g, "␣").replace(/\n/g, "↵");
+    }
+
+    // Helper: numerically stable softmax over a 1D array/TypedArray of logits
+    function stableSoftmax(logitsArray) {
+      let maxVal = -Infinity;
+      for (let i = 0; i < logitsArray.length; i++) {
+        if (logitsArray[i] > maxVal) maxVal = logitsArray[i];
+      }
+      const exps = new Float64Array(logitsArray.length);
+      let sum = 0;
+      for (let i = 0; i < logitsArray.length; i++) {
+        const e = Math.exp(logitsArray[i] - maxVal);
+        exps[i] = e;
+        sum += e;
+      }
+      for (let i = 0; i < exps.length; i++) {
+        exps[i] /= sum;
+      }
+      return exps;
+    }
+
+    // Helper: compute perplexity using logs so long sentences don't overflow
+    // perplexity = exp( average of -ln(P) )
+    function computePerplexityFromProbs(probs) {
+      let sumNegLog = 0;
+      for (const p of probs) {
+        sumNegLog += -Math.log(Math.max(p, 1e-12));
+      }
+      return Math.exp(sumNegLog / probs.length);
+    }
+
+    // Render the 3-step summary (used by both Section 2 and Section 4)
+    function renderSteps(probs, step1El, step2El, step3El) {
+      if (probs.length === 0) {
+        step1El.textContent = "—";
+        step2El.textContent = "N = 0";
+        step3El.textContent = "—";
+        return;
+      }
+      const invs = probs.map((p) => 1 / p);
+      const product = invs.reduce((acc, v) => acc * v, 1);
+      const multStr = invs.map((v) => v.toFixed(2)).join(" × ");
+      const prodStr = Number.isFinite(product) ? product.toFixed(2) : "∞ (overflow avoided via logs)";
+
+      step1El.textContent = `${multStr} = ${prodStr}`;
+      step2El.textContent = `N = ${probs.length} tokens`;
+      const ppl = computePerplexityFromProbs(probs);
+      step3El.textContent = Number.isInteger(ppl) ? String(ppl) : ppl.toFixed(2);
+    }
+
+    // Load the model on first use
+    async function ensureModelLoaded() {
+      if (tokenizer && model) return true;
+      if (isLoading) return false;
+
+      isLoading = true;
+      calcBtn.disabled = true;
+      statusLine.className = "status-line";
+      statusLine.textContent = "Downloading the model… (Xenova/distilgpt2, q8)";
+
+      try {
+        tokenizer = await AutoTokenizer.from_pretrained("Xenova/distilgpt2");
+        model = await AutoModelForCausalLM.from_pretrained("Xenova/distilgpt2", { dtype: "q8" });
+        statusLine.className = "status-line ready";
+        statusLine.textContent = "Model ready";
+        isLoading = false;
+        calcBtn.disabled = false;
+        return true;
+      } catch (err) {
+        isLoading = false;
+        calcBtn.disabled = false;
+        statusLine.className = "status-line error";
+        statusLine.textContent = `Failed to load model: ${err?.message || err}`;
+        return false;
+      }
+    }
+
+    // Run inference and update Section 2 & Section 3
+    async function calculatePerplexity() {
+      const sentence = sentenceInput.value.trim();
+      if (!sentence) {
+        statusLine.className = "status-line error";
+        statusLine.textContent = "Please type a sentence first.";
+        return;
+      }
+
+      const ok = await ensureModelLoaded();
+      if (!ok) return;
+
+      calcBtn.disabled = true;
+      statusLine.className = "status-line";
+      statusLine.textContent = "Calculating…";
+
+      try {
+        // 50256 is GPT-2's BOS/EOS start marker so the first word also gets a probability
+        const encoded = tokenizer.encode(sentence);
+        const ids = [50256, ...encoded];
+        const n = ids.length;
+
+        // Build int64 Tensor of shape [1, n]
+        const inputIds = new Tensor("int64", BigInt64Array.from(ids.map(BigInt)), [1, n]);
+        const output = await model({ input_ids: inputIds });
+        const logits = output.logits; // shape [1, n, vocabSize]
+        const vocabSize = logits.dims[2];
+        const data = logits.data;
+
+        // Clear previous table
+        modelTableBody.innerHTML = "";
+        const probs = [];
+
+        // For each real token (index 1..n-1), use logits at position i-1
+        for (let i = 1; i < n; i++) {
+          const prevOffset = (i - 1) * vocabSize;
+          const slice = data.subarray(prevOffset, prevOffset + vocabSize);
+          const softmaxProbs = stableSoftmax(slice);
+
+          const tokenId = ids[i];
+          const p = softmaxProbs[tokenId];
+          probs.push(p);
+
+          const tokenText = formatToken(tokenizer.decode([tokenId]));
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${i}</td>
+            <td><span class="token-pill">${tokenText}</span></td>
+            <td>${p.toFixed(4)}</td>
+            <td>${(1 / p).toFixed(2)}</td>
+          `;
+          modelTableBody.appendChild(tr);
+        }
+
+        modelResultsEmpty.style.display = "none";
+        modelResults.style.display = "block";
+        renderSteps(probs, modelStep1, modelStep2, modelStep3);
+
+        // Section 3: Top 8 next tokens from the last position (n - 1)
+        const lastOffset = (n - 1) * vocabSize;
+        const lastSlice = data.subarray(lastOffset, lastOffset + vocabSize);
+        const nextProbs = stableSoftmax(lastSlice);
+
+        // Find top 8 indices
+        const topK = Array.from(nextProbs, (prob, idx) => ({ idx, prob }))
+          .sort((a, b) => b.prob - a.prob)
+          .slice(0, 8);
+
+        nextEmpty.style.display = "none";
+        nextBars.innerHTML = "";
+        topK.forEach((item, rank) => {
+          const pct = (item.prob * 100).toFixed(2);
+          const label = formatToken(tokenizer.decode([item.idx]));
+          const row = document.createElement("div");
+          row.className = rank === 0 ? "bar-row top" : "bar-row";
+          row.innerHTML = `
+            <div><span class="token-pill">${label}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, item.prob * 100)}%"></div></div>
+            <div class="bar-pct">${pct}%</div>
+          `;
+          nextBars.appendChild(row);
+        });
+
+        statusLine.className = "status-line ready";
+        statusLine.textContent = "Model ready";
+      } catch (err) {
+        statusLine.className = "status-line error";
+        statusLine.textContent = `Error during calculation: ${err?.message || err}`;
+      } finally {
+        calcBtn.disabled = false;
+      }
+    }
+
+    calcBtn.addEventListener("click", calculatePerplexity);
+    document.querySelectorAll(".sample-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        sentenceInput.value = btn.dataset.text;
+        calculatePerplexity();
+      });
+    });
+
+    // =====================================================================
+    // Section 4: Try it by hand (Simulated, not from the model)
+    // =====================================================================
+    const simRowsEl = document.getElementById("simRows");
+    const simTableBody = document.getElementById("simTableBody");
+    const simStep1 = document.getElementById("simStep1");
+    const simStep2 = document.getElementById("simStep2");
+    const simStep3 = document.getElementById("simStep3");
+    const addTokenBtn = document.getElementById("addTokenBtn");
+
+    let simData = [
+      { token: "I", prob: 0.5 },
+      { token: "love", prob: 0.8 },
+      { token: "Python", prob: 0.2 },
+    ];
+
+    function renderSimulator() {
+      simRowsEl.innerHTML = "";
+      simTableBody.innerHTML = "";
+      const validProbs = [];
+
+      simData.forEach((item, idx) => {
+        // Input row
+        const row = document.createElement("div");
+        row.className = "sim-row";
+        row.innerHTML = `
+          <input type="text" value="${item.token}" placeholder="Token" aria-label="Token ${idx + 1}" />
+          <input type="number" step="0.01" min="0.0001" max="1" value="${item.prob}" aria-label="Probability ${idx + 1}" />
+          <button class="btn btn-danger btn-sm">Remove</button>
+        `;
+        const [tokInput, probInput, remBtn] = row.children;
+        tokInput.addEventListener("input", (e) => {
+          simData[idx].token = e.target.value;
+          updateSimTableOnly();
+        });
+        probInput.addEventListener("input", (e) => {
+          simData[idx].prob = parseFloat(e.target.value) || 0;
+          updateSimTableOnly();
+        });
+        remBtn.addEventListener("click", () => {
+          simData.splice(idx, 1);
+          renderSimulator();
+        });
+        simRowsEl.appendChild(row);
+      });
+
+      updateSimTableOnly();
+    }
+
+    function updateSimTableOnly() {
+      simTableBody.innerHTML = "";
+      const validProbs = [];
+
+      simData.forEach((item, idx) => {
+        const p = Math.min(1, Math.max(1e-6, Number(item.prob) || 0));
+        if (item.prob > 0) validProbs.push(p);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td><span class="token-pill">${formatToken(item.token || "—")}</span></td>
+          <td>${p.toFixed(4)}</td>
+          <td>${(1 / p).toFixed(2)}</td>
+        `;
+        simTableBody.appendChild(tr);
+      });
+
+      renderSteps(validProbs, simStep1, simStep2, simStep3);
+    }
+
+    addTokenBtn.addEventListener("click", () => {
+      simData.push({ token: "word", prob: 0.5 });
+      renderSimulator();
+    });
+
+    const PRESETS = {
+      python: [
+        { token: "I", prob: 0.5 },
+        { token: "love", prob: 0.8 },
+        { token: "Python", prob: 0.2 },
+      ],
+      eighth: Array.from({ length: 8 }, (_, i) => ({ token: `t${i + 1}`, prob: 0.125 })),
+      surprising: [
+        { token: "The", prob: 0.9 },
+        { token: "cat", prob: 0.9 },
+        { token: "sat", prob: 0.9 },
+        { token: "quantum", prob: 0.01 },
+      ],
+    };
+
+    document.querySelectorAll(".preset-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        simData = PRESETS[btn.dataset.preset].map((x) => ({ ...x }));
+        renderSimulator();
+      });
+    });
+
+    // Initialize Section 4 with "I love Python" preset (perplexity 2.32)
+    renderSimulator();
+  </script>
+
+  <!-- ===================================================================== -->
+  <!-- SCRIPT 2: Ascend WebGL Earth, Shaders, Bloom, & Lenis Smooth Scroll   -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    import * as THREE from "three";
+    import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+    import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+    import { GammaCorrectionShader } from "three/examples/jsm/shaders/GammaCorrectionShader.js";
+    import { CopyShader } from "three/examples/jsm/shaders/CopyShader.js";
+    import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+    import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import Lenis from "https://unpkg.com/lenis@1.3.23/dist/lenis.mjs";
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Lenis smooth scroll
+    let lenis = null;
+    if (!reducedMotion) {
+      lenis = new Lenis({ duration: 1.15, smoothWheel: true, touchMultiplier: 1.5 });
+    }
+
+    // Staggered scroll-reveal
+    const revealEls = document.querySelectorAll("[data-reveal]");
+    if (reducedMotion) {
+      revealEls.forEach((el) => el.classList.add("in"));
+    } else {
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in");
+              io.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -6% 0px" }
+      );
+      revealEls.forEach((el) => io.observe(el));
+    }
+
+    // =====================================================================
+    // WebGL Planet Scene
+    // =====================================================================
+    const ASSET_BASE_URL = "https://api.getlayers.ai/storage/v1/object/public/public/assets/ascend-d9857ad1f2";
+    const PLANET_GLB = `${ASSET_BASE_URL}/planet.glb`;
+    const PLANET_LIGHTS_GLB = `${ASSET_BASE_URL}/planet-lights.glb`;
+    const PLANET_CLOUDS_PNG = `${ASSET_BASE_URL}/planet-clouds.png`;
+
+    const CONFIG = {
+      rimColor: "#c1faff", rimPower: 2.4, nightLights: 10, terrainDepth: 0.33, terrainShade: 1.3,
+      oceanGlint: 0.45, oceanDeep: 0.12, oceanFlow: 3, oceanFlowSpeed: 0.8, oceanFlowScale: 2.1,
+      glowColor: "#3a6cff", glowIntensity: 3.35, planetRadius: 1.95, spin: 0.03, initRotation: 2.07,
+      tilt: 0.37, autoRotate: 0,
+      cloud1Height: 1.005, cloud1Opacity: 0.6, cloud1Spin: 0.06,
+      cloud2Height: 1.03, cloud2Opacity: 0.5, cloud2Spin: 0.14,
+      cloud3Height: 1.075, cloud3Opacity: 0.5, cloud3Spin: 0.1,
+      bgColor: "#040a1e", flameColor: "#3a6cff", flameColor2: "#c1faff", flameAmt: 0.15,
+      atmoColor: "#9fc4ff", atmoCount: 320, atmoSize: 22, atmoSpeed: 0.8,
+      starColor: "#cfe0ff", starCount: 1400, starSize: 1.6, starFlicker: 1,
+      markerColor: "#ffd27a", markerCount: 60, markerSize: 16, markerSpeed: 0.5,
+    };
+    const LAYERS = { NONE: 0, TORUS_SCENE: 1, BLOOM_SCENE: 2, ENTIRE_SCENE: 3 };
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const hexToVec3 = (hex) => {
+      const c = new THREE.Color(hex);
+      return new THREE.Vector3(c.r, c.g, c.b);
+    };
+    function sample(stops, p) {
+      if (p <= stops[0].p) return stops[0].v;
+      for (let i = 1; i < stops.length; i++) {
+        if (p <= stops[i].p) {
+          const a = stops[i - 1], b = stops[i];
+          const t = (p - a.p) / (b.p - a.p);
+          const s = t * t * (3 - 2 * t);
+          return a.v + (b.v - a.v) * s;
+        }
+      }
+      return stops[stops.length - 1].v;
+    }
+
+    const SNOISE = `
+vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0); const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i = floor(v + dot(v, C.yyy)); vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz); vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy); vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + 1.0 * C.xxx; vec3 x2 = x0 - i2 + 2.0 * C.xxx; vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+  i = mod(i, 289.0);
+  vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 1.0/7.0; vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z *ns.z);
+  vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ *ns.x + ns.yyyy; vec4 y = y_ *ns.x + ns.yyyy; vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy); vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+  vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.5 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0); m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}`;
+
+    const canvas = document.querySelector(".planet-canvas");
+    const renderer = new THREE.WebGL1Renderer({ canvas, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.VSMShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 0, 8);
+    camera.layers.enable(LAYERS.TORUS_SCENE);
+    camera.layers.enable(LAYERS.BLOOM_SCENE);
+    camera.layers.enable(LAYERS.ENTIRE_SCENE);
+    scene.add(camera);
+
+    const ambLight = new THREE.AmbientLight(0xffffff, 1.8);
+    ambLight.layers.set(LAYERS.ENTIRE_SCENE);
+    scene.add(ambLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(0, 10, 2);
+    dirLight.layers.set(LAYERS.ENTIRE_SCENE);
+    scene.add(dirLight);
+
+    // Composers
+    const torusComposer = new EffectComposer(renderer);
+    torusComposer.renderToScreen = false;
+    torusComposer.addPass(new RenderPass(scene, camera));
+    torusComposer.addPass(new ShaderPass(GammaCorrectionShader));
+    torusComposer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.22, 0.2, 0));
+    torusComposer.addPass(new ShaderPass(CopyShader));
+
+    const bloomComposer = new EffectComposer(renderer);
+    bloomComposer.renderToScreen = false;
+    bloomComposer.addPass(new RenderPass(scene, camera));
+    bloomComposer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.6, 0));
+    bloomComposer.addPass(new ShaderPass(GammaCorrectionShader));
+
+    const FinalPass = {
+      uniforms: {
+        iTime: { value: 0 }, tDiffuse: { value: null }, torusTexture: { value: null },
+        bloomTexture: { value: null }, haloTexture: { value: null },
+        uBg: { value: hexToVec3(CONFIG.bgColor) }, uFlameA: { value: hexToVec3(CONFIG.flameColor) },
+        uFlameB: { value: hexToVec3(CONFIG.flameColor2) }, uFlameAmt: { value: CONFIG.flameAmt },
+      },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position, 1.0); }`,
+      fragmentShader: `
+        uniform float iTime; uniform sampler2D tDiffuse; uniform sampler2D bloomTexture; uniform sampler2D torusTexture; uniform sampler2D haloTexture;
+        uniform vec3 uBg; uniform vec3 uFlameA; uniform vec3 uFlameB; uniform float uFlameAmt;
+        varying vec2 vUv;
+        vec3 warp3d(vec3 pos, float t){ float curv=.8,a=1.9,b=0.7; pos*=2.;
+          pos.x+=curv*sin(t+a*pos.y)+t*b; pos.y+=curv*cos(t+a*pos.x);
+          pos.y+=curv*sin(t+a*pos.z)+t*b; pos.z+=curv*cos(t+a*pos.y);
+          pos.z+=curv*sin(t+a*pos.x)+t*b; pos.x+=curv*cos(t+a*pos.z);
+          return 0.5+0.5*cos(pos.xyz+vec3(1,2,4)); }
+        void main(){
+          vec2 uv = 2.*vUv - 1.;
+          vec3 w = pow(warp3d(vec3(uv.x, sin(uv.y), uv.y), iTime*1.5), vec3(1.5));
+          vec3 flame = 1.5*uFlameA*w.x; flame*=w.y; flame += uFlameB*w.z;
+          flame *= smoothstep(0.25, 1., abs(uv.y));
+          float md = smoothstep(-0.7, 1., -uv.y*uv.x); flame *= md*md;
+          vec3 bg = uBg * (1.0 - 0.4 * length(uv));
+          vec3 halo = texture2D(haloTexture, vUv).xyz;
+          gl_FragColor = vec4(bg + flame*uFlameAmt + texture2D(bloomTexture, vUv).xyz + texture2D(torusTexture, vUv).xyz + texture2D(tDiffuse, vUv).xyz + halo, 1.);
+        }`,
+    };
+
+    const finalPass = new ShaderPass(FinalPass);
+    finalPass.uniforms.bloomTexture.value = bloomComposer.renderTarget1.texture;
+    finalPass.uniforms.torusTexture.value = torusComposer.renderTarget1.texture;
+
+    const finalComposer = new EffectComposer(renderer);
+    finalComposer.addPass(new RenderPass(scene, camera));
+    finalComposer.addPass(finalPass);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.enablePan = false;
+    controls.enabled = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = CONFIG.autoRotate;
+    controls.minDistance = 3.5;
+    controls.maxDistance = 16;
+    controls.target.set(0, 0, 0);
+
+    // Scroll stops
+    const STOPS_X = [{ p: 0, v: 0 }, { p: 0.32, v: -3.1 }, { p: 0.64, v: 3.2 }, { p: 1, v: 0 }];
+    const STOPS_Y = [{ p: 0, v: -4.5 }, { p: 0.32, v: 0.55 }, { p: 0.64, v: 0.45 }, { p: 1, v: 0.15 }];
+    const STOPS_S = [{ p: 0, v: 2.15 }, { p: 0.32, v: 1.0 }, { p: 0.64, v: 0.92 }, { p: 1, v: 1.12 }];
+
+    const worldGroup = new THREE.Group();
+    worldGroup.position.set(STOPS_X[0].v, STOPS_Y[0].v, 0);
+    worldGroup.scale.setScalar(STOPS_S[0].v);
+    scene.add(worldGroup);
+
+    const planetGroup = new THREE.Group();
+    planetGroup.rotation.z = CONFIG.tilt;
+    worldGroup.add(planetGroup);
+
+    const cloudGroup = new THREE.Group();
+    cloudGroup.rotation.z = CONFIG.tilt;
+    cloudGroup.visible = false;
+    worldGroup.add(cloudGroup);
+
+    // Atmosphere halo
+    const glowMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          uGlow: { value: hexToVec3(CONFIG.glowColor) },
+          uIntensity: { value: CONFIG.glowIntensity },
+        },
+        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform vec3 uGlow; uniform float uIntensity; varying vec2 vUv;
+          void main(){
+            float d = length(vUv - 0.5) * 2.0;
+            float a = pow(clamp(1.0 - d, 0.0, 1.0), 2.2);
+            gl_FragColor = vec4(uGlow * a * uIntensity, a);
+          }`,
+      })
+    );
+    glowMesh.scale.setScalar(CONFIG.planetRadius * 2.3);
+    glowMesh.layers.set(LAYERS.ENTIRE_SCENE);
+    worldGroup.add(glowMesh);
+
+    // Starfield
+    const starTime = { value: 0 };
+    const starPos = new Float32Array(CONFIG.starCount * 3);
+    const starSeed = new Float32Array(CONFIG.starCount);
+    const starBright = new Float32Array(CONFIG.starCount);
+    for (let i = 0; i < CONFIG.starCount; i++) {
+      const u = Math.random(), v = Math.random();
+      const theta = 2 * Math.PI * u, phi = Math.acos(2 * v - 1);
+      starPos[i * 3] = 90 * Math.sin(phi) * Math.cos(theta);
+      starPos[i * 3 + 1] = 90 * Math.sin(phi) * Math.sin(theta);
+      starPos[i * 3 + 2] = 90 * Math.cos(phi);
+      starSeed[i] = Math.random() * 100;
+      starBright[i] = 0.35 + Math.random() * 0.65;
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+    starGeo.setAttribute("seed", new THREE.BufferAttribute(starSeed, 1));
+    starGeo.setAttribute("bright", new THREE.BufferAttribute(starBright, 1));
+    const starMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: starTime, uSize: { value: CONFIG.starSize }, uFlicker: { value: CONFIG.starFlicker },
+        uColor: { value: hexToVec3(CONFIG.starColor) },
+        uRes: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      },
+      vertexShader: `
+        attribute float seed; attribute float bright;
+        uniform float uTime; uniform float uSize; uniform float uFlicker; uniform vec2 uRes;
+        varying float vTw;
+        void main(){
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float tw = 0.6 + 0.4 * sin(uTime * uFlicker + seed);
+          vTw = bright * tw;
+          gl_PointSize = max(uSize * uRes.y / 900.0 * (90.0 / max(-mv.z, 1.0)), 1.0);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor; varying float vTw;
+        void main(){
+          vec2 p = gl_PointCoord - 0.5; float l = length(p); if (l > 0.5) discard;
+          float core = smoothstep(0.5, 0.0, l);
+          gl_FragColor = vec4(uColor, core * vTw);
+        }`,
+    });
+    const stars = new THREE.Points(starGeo, starMat);
+    stars.frustumCulled = false;
+    stars.layers.set(LAYERS.ENTIRE_SCENE);
+    scene.add(stars);
+
+    // Ambient atmosphere motes
+    const atmoPos = new Float32Array(CONFIG.atmoCount * 3);
+    const atmoSize = new Float32Array(CONFIG.atmoCount);
+    const atmoSeed = new Float32Array(CONFIG.atmoCount);
+    for (let i = 0; i < CONFIG.atmoCount; i++) {
+      atmoPos[i * 3] = Math.random() * 2 - 1;
+      atmoPos[i * 3 + 1] = Math.random() * 2 - 1;
+      atmoPos[i * 3 + 2] = Math.random() * 2 - 1;
+      atmoSize[i] = CONFIG.atmoSize * (0.4 + Math.random());
+      atmoSeed[i] = Math.random() * 100;
+    }
+    const atmoGeo = new THREE.BufferGeometry();
+    atmoGeo.setAttribute("position", new THREE.BufferAttribute(atmoPos, 3));
+    atmoGeo.setAttribute("size", new THREE.BufferAttribute(atmoSize, 1));
+    atmoGeo.setAttribute("seed", new THREE.BufferAttribute(atmoSeed, 1));
+    const atmoMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: hexToVec3(CONFIG.atmoColor) },
+        uRes: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      },
+      vertexShader: `
+        attribute float size; attribute float seed; uniform float uTime; uniform vec2 uRes;
+        varying float vA;
+        vec3 warp(vec3 p, float t){ float c=0.9,a=1.9,b=0.02,s=0.05; p*=2.;
+          p.x+=c*sin(s*t+a*p.y)+t*b; p.y+=c*cos(s*t+a*p.x); p.y+=c*sin(s*t+a*p.z)+t*b;
+          p.z+=c*cos(s*t+a*p.y); p.z+=c*sin(s*t+a*p.x)+t*b; p.x+=c*cos(s*t+a*p.z);
+          return cos(p+vec3(1,2,4)); }
+        void main(){
+          vec3 v = position*4.0 + warp(position, uTime)*1.2;
+          vec4 mv = modelViewMatrix * vec4(v, 1.0);
+          float r = length(v); float farF = 1.0 - smoothstep(5.0, 6.5, r); float nearF = smoothstep(0.0, 0.5, -mv.z);
+          vA = farF * nearF;
+          gl_PointSize = size * uRes.y / 900.0 / -mv.z; gl_PointSize = max(gl_PointSize, 1.0);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor; varying float vA;
+        void main(){ vec2 p = gl_PointCoord - 0.5; float l = length(p); if (l > 0.5) discard;
+          float tex = smoothstep(0.5, 0.0, l); gl_FragColor = vec4(uColor * tex, tex * vA * 0.55); }`,
+    });
+    const atmoPoints = new THREE.Points(atmoGeo, atmoMat);
+    atmoPoints.frustumCulled = false;
+    atmoPoints.layers.set(LAYERS.ENTIRE_SCENE);
+    atmoPoints.onBeforeRender = () => {
+      const t = performance.now() * 0.001;
+      atmoMat.uniforms.uTime.value = t * CONFIG.atmoSpeed * 8;
+      atmoPoints.position.copy(camera.position);
+      finalPass.uniforms.iTime.value = t;
+    };
+    scene.add(atmoPoints);
+
+    // Clouds
+    const cloudTime = { value: 0 };
+    const cloudMeshes = [];
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load(PLANET_CLOUDS_PNG, (cloudTex) => {
+      cloudTex.wrapS = cloudTex.wrapT = THREE.RepeatWrapping;
+      cloudTex.repeat.set(5, 5);
+      const layers = [
+        { h: "cloud1Height", o: "cloud1Opacity", s: "cloud1Spin", ry: 0.0, phase: 0.0 },
+        { h: "cloud2Height", o: "cloud2Opacity", s: "cloud2Spin", ry: 2.2, phase: 13.0 },
+        { h: "cloud3Height", o: "cloud3Opacity", s: "cloud3Spin", ry: 4.3, phase: 27.0 },
+      ];
+      layers.forEach((l) => {
+        const mat = new THREE.MeshStandardMaterial({ map: cloudTex, transparent: true, depthWrite: false });
+        mat.onBeforeCompile = (shader) => {
+          shader.uniforms.uTime = cloudTime;
+          shader.uniforms.noiseScale = { value: 20 };
+          shader.uniforms.uSpeedX = { value: 1 };
+          shader.uniforms.uSpeedY = { value: 2 };
+          shader.uniforms.uSpeedZ = { value: 2 };
+          shader.uniforms.uOpacity = { value: CONFIG[l.o] };
+          shader.uniforms.uPhase = { value: l.phase };
+          shader.vertexShader = `varying vec2 vCloudUv;\n` + shader.vertexShader.replace(
+            "void main() {",
+            "void main() {\n  vCloudUv = uv;"
+          );
+          shader.fragmentShader = `
+            uniform float uTime; uniform float noiseScale; uniform float uSpeedX; uniform float uSpeedY; uniform float uSpeedZ;
+            uniform float uOpacity; uniform float uPhase; varying vec2 vCloudUv;
+            ${SNOISE}
+          ` + shader.fragmentShader.replace(
+            "#include <dithering_fragment>",
+            `#include <dithering_fragment>
+            gl_FragColor.rgb = vec3(1.0);
+            float cloudNoise = snoise(vec3(vCloudUv.x * noiseScale + uTime * uSpeedX + uPhase, vCloudUv.y * noiseScale - uTime * uSpeedY + uPhase, uTime * uSpeedZ + uPhase));
+            float cloudNdv = max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0);
+            float cloudEdge = pow(1.0 - cloudNdv, 3.0);
+            float cloudMod = mix(cloudNoise, 1.0, cloudEdge);
+            float cloudNdl = dot(normalize(vNormal), normalize(vec3(-0.9, 0.18, 0.4)));
+            float cloudDay = 1.0 - smoothstep(0.30, -0.30, cloudNdl) * 0.9;
+            gl_FragColor.a *= cloudMod * uOpacity * cloudDay;`
+          );
+        };
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(CONFIG.planetRadius * CONFIG[l.h], 64, 64), mat);
+        mesh.rotation.y = l.ry;
+        mesh.renderOrder = 2;
+        mesh.layers.set(LAYERS.ENTIRE_SCENE);
+        cloudGroup.add(mesh);
+        cloudMeshes.push({ mesh, spinKey: l.s });
+      });
+    });
+
+    // Planet & Night Lights
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.5/");
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    const planetTime = { value: 0 };
+    const markerTime = { value: 0 };
+    let planetLoadedAt = null;
+    const ENTRY_DUR = 1.9;
+    const ENTRY_START_Y = -6.5;
+
+    gltfLoader.load(PLANET_LIGHTS_GLB, (lightsGltf) => {
+      let nightTex = null;
+      lightsGltf.scene.traverse((c) => {
+        if (c.isMesh && c.material && c.material.map && !nightTex) nightTex = c.material.map;
+      });
+
+      gltfLoader.load(PLANET_GLB, (planetGltf) => {
+        let planetMesh = null;
+        planetGltf.scene.traverse((c) => {
+          if (c.isMesh && !planetMesh) planetMesh = c;
+        });
+        if (!planetMesh) return;
+
+        planetMesh.geometry.computeBoundingSphere();
+        const scale = CONFIG.planetRadius / planetMesh.geometry.boundingSphere.radius;
+        planetMesh.scale.setScalar(scale);
+
+        const mat = planetMesh.material.clone();
+        mat.metalness = 0;
+        mat.roughness = 1;
+        mat.envMapIntensity = 0;
+        mat.onBeforeCompile = (shader) => {
+          shader.uniforms.time = planetTime;
+          shader.uniforms.noiseScale = { value: 30 };
+          shader.uniforms.speedX = { value: 1.5 };
+          shader.uniforms.speedY = { value: 2.0 };
+          shader.uniforms.speedZ = { value: 2.5 };
+          shader.uniforms.rimColor = { value: hexToVec3(CONFIG.rimColor) };
+          shader.uniforms.rimPower = { value: CONFIG.rimPower };
+          shader.uniforms.nightBlendTexture = { value: nightTex };
+          shader.uniforms.nightLights = { value: CONFIG.nightLights };
+          shader.uniforms.terrainDepth = { value: CONFIG.terrainDepth };
+          shader.uniforms.terrainShade = { value: CONFIG.terrainShade };
+          shader.uniforms.oceanGlint = { value: CONFIG.oceanGlint };
+          shader.uniforms.oceanDeep = { value: CONFIG.oceanDeep };
+          shader.uniforms.oceanFlow = { value: CONFIG.oceanFlow };
+          shader.uniforms.oceanFlowSpeed = { value: CONFIG.oceanFlowSpeed };
+          shader.uniforms.oceanFlowScale = { value: CONFIG.oceanFlowScale };
+
+          shader.vertexShader = `varying vec2 vCustomUv;\n` + shader.vertexShader.replace(
+            "void main() {",
+            "void main() {\n  vCustomUv = uv;"
+          );
+          shader.fragmentShader = `
+            uniform float time; uniform float noiseScale; uniform float speedX; uniform float speedY; uniform float speedZ;
+            uniform vec3 rimColor; uniform float rimPower; uniform sampler2D nightBlendTexture; uniform float nightLights;
+            uniform float terrainDepth; uniform float terrainShade; uniform float oceanGlint; uniform float oceanDeep;
+            uniform float oceanFlow; uniform float oceanFlowSpeed; uniform float oceanFlowScale;
+            varying vec2 vCustomUv;
+            ${SNOISE}
+          ` + shader.fragmentShader.replace(
+            "#include <dithering_fragment>",
+            `#include <dithering_fragment>
+            vec3 normalizedNormal = normalize(vNormal);
+            vec3 viewDir = normalize(vViewPosition);
+            float rim = 1.0 - max(dot(viewDir, normalizedNormal), 0.0);
+            rim = pow(rim, rimPower); rim = pow(rim, 1.5); rim *= 0.7;
+            vec3 currentColor = gl_FragColor.rgb;
+            float blueDom = currentColor.b - max(currentColor.r, currentColor.g);
+            float waterMask = clamp(smoothstep(-0.005, 0.03, blueDom), 0.0, 1.0);
+            float shimmer = snoise(vec3(vCustomUv.x * noiseScale + time * speedX, vCustomUv.y * noiseScale - time * speedY, time * speedZ));
+            gl_FragColor.rgb += waterMask * shimmer * 0.025;
+            float fT = time * oceanFlowSpeed * 4.0;
+            float fS = 4.0 * oceanFlowScale;
+            float warp = snoise(vec3(vCustomUv.x * fS - fT * 0.5, vCustomUv.y * fS + fT * 0.4, fT * 0.5));
+            float flow = snoise(vec3(vCustomUv.x * fS * 2.0 + fT * 0.6 + warp, vCustomUv.y * fS * 2.0 - fT * 0.5, fT * 0.7));
+            flow = warp * 0.6 + flow * 0.4;
+            gl_FragColor.rgb += waterMask * flow * 0.12 * oceanFlow;
+            gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.01, 0.06, 0.16), waterMask * oceanDeep);
+            vec3 finalColor = mix(gl_FragColor.rgb, rimColor, rim);
+            gl_FragColor = vec4(finalColor, 1.0);
+            vec3 surfPos = -vViewPosition;
+            float terrH = dot(texture2D(map, vCustomUv).rgb, vec3(0.299, 0.587, 0.114));
+            vec3 sigX = dFdx(surfPos), sigY = dFdy(surfPos);
+            vec3 vR1 = cross(sigY, normalizedNormal), vR2 = cross(normalizedNormal, sigX);
+            float fDet = dot(sigX, vR1);
+            vec3 vGrad = sign(fDet) * (dFdx(terrH) * vR1 + dFdy(terrH) * vR2);
+            vec3 bumpedNormal = normalize(abs(fDet) * normalizedNormal - terrainDepth * vGrad);
+            vec3 shadeNormal = mix(bumpedNormal, normalizedNormal, waterMask);
+            vec3 cityLights = texture2D(nightBlendTexture, vCustomUv).rgb * gl_FragColor.rgb * nightLights;
+            vec3 viewSunDir = normalize(vec3(-0.9, 0.18, 0.4));
+            float ndl = dot(normalizedNormal, viewSunDir);
+            float dayAmt = smoothstep(-0.05, 0.35, ndl);
+            float relief = dot(shadeNormal, viewSunDir) - ndl;
+            gl_FragColor.rgb *= clamp(1.0 + relief * terrainShade * dayAmt, 0.55, 1.6);
+            float nightFactor  = smoothstep(0.18, -0.30, ndl);
+            float lightsFactor = smoothstep(0.30, -0.35, ndl);
+            gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.08, nightFactor);
+            gl_FragColor.rgb += cityLights * lightsFactor;
+            vec3 halfDir = normalize(viewSunDir + viewDir);
+            float ripple = snoise(vec3(vCustomUv * 240.0, time * 4.0));
+            float ndh = max(dot(normalizedNormal, halfDir) + ripple * 0.02, 0.0);
+            float glint = pow(ndh, 140.0);
+            gl_FragColor.rgb += glint * waterMask * dayAmt * oceanGlint * vec3(1.0, 0.97, 0.88);`
+          );
+        };
+        planetMesh.material = mat;
+        planetMesh.layers.set(LAYERS.ENTIRE_SCENE);
+        planetGroup.add(planetMesh);
+        cloudGroup.visible = true;
+        planetLoadedAt = performance.now() * 0.001;
+
+        // Land markers
+        if (mat.map && mat.map.image) {
+          const img = mat.map.image;
+          const c2d = document.createElement("canvas");
+          c2d.width = img.width; c2d.height = img.height;
+          const ctx = c2d.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          const pixels = ctx.getImageData(0, 0, img.width, img.height).data;
+
+          const posAttr = planetMesh.geometry.attributes.position;
+          const uvAttr = planetMesh.geometry.attributes.uv;
+          const index = planetMesh.geometry.index;
+          const triCount = index ? index.count / 3 : posAttr.count / 3;
+          const cumArea = new Float32Array(triCount);
+          const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+          const ab = new THREE.Vector3(), ac = new THREE.Vector3();
+          let totalArea = 0;
+
+          for (let i = 0; i < triCount; i++) {
+            const i0 = index ? index.getX(i * 3) : i * 3;
+            const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
+            const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
+            a.fromBufferAttribute(posAttr, i0);
+            b.fromBufferAttribute(posAttr, i1);
+            c.fromBufferAttribute(posAttr, i2);
+            ab.subVectors(b, a); ac.subVectors(c, a);
+            totalArea += ab.cross(ac).length() * 0.5;
+            cumArea[i] = totalArea;
+          }
+
+          const mPos = [], mSeed = [];
+          let attempts = 0;
+          while (mPos.length / 3 < CONFIG.markerCount && attempts < CONFIG.markerCount * 20) {
+            attempts++;
+            const r = Math.random() * totalArea;
+            let lo = 0, hi = triCount - 1;
+            while (lo < hi) {
+              const mid = (lo + hi) >> 1;
+              if (cumArea[mid] < r) lo = mid + 1; else hi = mid;
+            }
+            const i0 = index ? index.getX(lo * 3) : lo * 3;
+            const i1 = index ? index.getX(lo * 3 + 1) : lo * 3 + 1;
+            const i2 = index ? index.getX(lo * 3 + 2) : lo * 3 + 2;
+            let r1 = Math.random(), r2 = Math.random();
+            if (r1 + r2 > 1) { r1 = 1 - r1; r2 = 1 - r2; }
+            const r0 = 1 - r1 - r2;
+
+            const u = uvAttr.getX(i0) * r0 + uvAttr.getX(i1) * r1 + uvAttr.getX(i2) * r2;
+            const v = uvAttr.getY(i0) * r0 + uvAttr.getY(i1) * r1 + uvAttr.getY(i2) * r2;
+            const px = Math.floor(((u % 1 + 1) % 1) * img.width);
+            const py = Math.floor((1 - ((v % 1 + 1) % 1)) * img.height);
+            const pIdx = (py * img.width + px) * 4;
+            const cr = pixels[pIdx], cg = pixels[pIdx + 1], cb = pixels[pIdx + 2];
+            if (cb > cr + 6 && cb > cg + 6) continue; // skip ocean
+
+            const px3 = (posAttr.getX(i0) * r0 + posAttr.getX(i1) * r1 + posAttr.getX(i2) * r2) * 1.012;
+            const py3 = (posAttr.getY(i0) * r0 + posAttr.getY(i1) * r1 + posAttr.getY(i2) * r2) * 1.012;
+            const pz3 = (posAttr.getZ(i0) * r0 + posAttr.getZ(i1) * r1 + posAttr.getZ(i2) * r2) * 1.012;
+            mPos.push(px3, py3, pz3);
+            mSeed.push(Math.random());
+          }
+
+          const mGeo = new THREE.BufferGeometry();
+          mGeo.setAttribute("position", new THREE.Float32BufferAttribute(mPos, 3));
+          mGeo.setAttribute("seed", new THREE.Float32BufferAttribute(mSeed, 1));
+          const mMat = new THREE.ShaderMaterial({
+            transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
+            uniforms: {
+              uTime: markerTime,
+              uColor: { value: hexToVec3(CONFIG.markerColor) },
+              uSize: { value: CONFIG.markerSize },
+              uSpeed: { value: CONFIG.markerSpeed },
+              uRes: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+            },
+            vertexShader: `
+              attribute float seed; uniform float uSize; uniform vec2 uRes;
+              varying float vSeed; varying float vFade;
+              void main(){
+                vSeed = seed;
+                vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                vec3 vn = normalize(normalMatrix * normalize(position));
+                vec3 vd = normalize(-mv.xyz);
+                vFade = smoothstep(0.15, 0.5, dot(vn, vd));
+                gl_PointSize = max(uSize * uRes.y / 900.0 * (7.0 / max(-mv.z, 1.0)), 2.0);
+                gl_Position = projectionMatrix * mv;
+              }`,
+            fragmentShader: `
+              uniform vec3 uColor; uniform float uTime; uniform float uSpeed;
+              varying float vSeed; varying float vFade;
+              void main(){
+                if (vFade <= 0.001) discard;
+                vec2 p = gl_PointCoord - 0.5;
+                float d = length(p) * 2.0;
+                if (d > 1.0) discard;
+                float core = smoothstep(0.30, 0.0, d) * 1.2;
+                float ph = fract(uTime * uSpeed + vSeed);
+                float ring = smoothstep(0.07, 0.0, abs(d - ph)) * (1.0 - ph);
+                gl_FragColor = vec4(uColor, clamp(core + ring, 0.0, 1.0) * vFade);
+              }`,
+          });
+          const markers = new THREE.Points(mGeo, mMat);
+          markers.layers.set(LAYERS.ENTIRE_SCENE);
+          planetMesh.add(markers);
+        }
+      });
+    });
+
+    // Resize
+    window.addEventListener("resize", () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      torusComposer.setSize(w, h);
+      bloomComposer.setSize(w, h);
+      finalComposer.setSize(w, h);
+      starMat.uniforms.uRes.value.set(w, h);
+      atmoMat.uniforms.uRes.value.set(w, h);
+    });
+
+    // Animation loop
+    let lastTime = performance.now() * 0.001;
+    let curP = 0, curX = STOPS_X[0].v, curY = STOPS_Y[0].v, curS = STOPS_S[0].v;
+    let spinPhase = 0;
+
+    function animate(nowMs) {
+      requestAnimationFrame(animate);
+      if (lenis) lenis.raf(nowMs);
+
+      const now = nowMs * 0.001;
+      const dt = Math.min(0.05, Math.max(0.001, now - lastTime));
+      lastTime = now;
+
+      planetTime.value += dt / 12;
+      cloudTime.value += dt / 20;
+      starTime.value += dt;
+      markerTime.value += dt;
+      spinPhase += dt * CONFIG.spin;
+
+      cloudMeshes.forEach((c) => { c.mesh.rotation.y += dt * CONFIG[c.spinKey]; });
+      glowMesh.quaternion.copy(camera.quaternion);
+
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const pTarget = clamp(window.scrollY / maxScroll, 0, 1);
+      curP += (pTarget - curP) * Math.min(1, dt * 4.5);
+
+      const sideScale = clamp(window.innerWidth / 1200, 0.5, 1);
+      const k = Math.min(1, dt * 3.2);
+      curX += (sample(STOPS_X, curP) * sideScale - curX) * k;
+      curY += (sample(STOPS_Y, curP) - curY) * k;
+      curS += (sample(STOPS_S, curP) - curS) * k;
+
+      let entryY = 0;
+      if (!reducedMotion && planetLoadedAt !== null) {
+        const t = clamp((now - planetLoadedAt) / ENTRY_DUR, 0, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        entryY = ENTRY_START_Y * (1 - eased);
+      }
+
+      worldGroup.position.set(curX, curY + entryY, 0);
+      worldGroup.scale.setScalar(curS);
+      planetGroup.rotation.y = CONFIG.initRotation + spinPhase + curP * Math.PI * 1.6;
+
+      camera.layers.set(LAYERS.TORUS_SCENE);
+      torusComposer.render();
+      camera.layers.set(LAYERS.BLOOM_SCENE);
+      bloomComposer.render();
+      camera.layers.set(LAYERS.ENTIRE_SCENE);
+      finalComposer.render();
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
